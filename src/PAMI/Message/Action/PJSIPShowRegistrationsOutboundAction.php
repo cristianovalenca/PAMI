@@ -1,6 +1,7 @@
 <?php
+
 /**
- * Command action message.
+ * Show registrations.
  *
  * PHP Version 5
  *
@@ -27,10 +28,11 @@
  * limitations under the License.
  *
  */
+
 namespace PAMI\Message\Action;
 
 /**
- * Command action message.
+ * Show registrations.
  *
  * PHP Version 5
  *
@@ -41,19 +43,15 @@ namespace PAMI\Message\Action;
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @link       http://marcelog.github.com/PAMI/
  */
-class CommandAction extends ActionMessage
+class PJSIPShowRegistrationsOutboundAction extends ActionMessage
 {
     /**
      * Constructor.
      *
-     * @param string $command CLI Command to issue.
-     *
      * @return void
      */
-    public function __construct($command)
+    public function __construct()
     {
-        parent::__construct('Command');
-        $this->setKey('Command', $command);
-        $this->setResponseHandler("Command");
+        parent::__construct('PJSIPShowRegistrationsOutbound');
     }
 }

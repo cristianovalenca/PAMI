@@ -1,13 +1,13 @@
 <?php
 /**
- * Command action message.
+ * Lists PJSIP endpoints.
  *
  * PHP Version 5
  *
  * @category   Pami
  * @package    Message
  * @subpackage Action
- * @author     Marcelo Gornstein <marcelog@gmail.com>
+ * @author     Maxim Dorofeev <makdorf@gmail.com>
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @version    SVN: $Id$
  * @link       http://marcelog.github.com/PAMI/
@@ -30,30 +30,30 @@
 namespace PAMI\Message\Action;
 
 /**
- * Command action message.
+ * Lists PJSIP endpoints.
+ *
+ * Provides a listing of all endpoints.  For each endpoint an 'EndpointList'
+ * event is raised that contains relevant attributes and status information.
+ * Once all endpoints have been listed an 'EndpointListComplete' event is issued.
  *
  * PHP Version 5
  *
  * @category   Pami
  * @package    Message
  * @subpackage Action
- * @author     Marcelo Gornstein <marcelog@gmail.com>
+ * @author     Maxim Dorofeev <makdorf@gmail.com>
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @link       http://marcelog.github.com/PAMI/
  */
-class CommandAction extends ActionMessage
+class PJSIPShowEndpointsAction extends ActionMessage
 {
     /**
      * Constructor.
      *
-     * @param string $command CLI Command to issue.
-     *
      * @return void
      */
-    public function __construct($command)
+    public function __construct()
     {
-        parent::__construct('Command');
-        $this->setKey('Command', $command);
-        $this->setResponseHandler("Command");
+        parent::__construct('PJSIPShowEndpoints');
     }
 }

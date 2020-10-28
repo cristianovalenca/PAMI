@@ -11,6 +11,9 @@
 
 # Introduction
 
+# Fork !
+Note that this is a fork of the official release by [Marcelo Gornstein](https://github.com/marcelog/PAMI).
+
 PAMI means PHP Asterisk Manager Interface. As its name suggests its just a
 set of php classes that will let you issue commands to an ami and/or receive
 events, using an observer-listener pattern.
@@ -37,7 +40,7 @@ Add this library to your [Composer](https://packagist.org/) configuration. In
 composer.json:
 ```json
   "require": {
-    "marcelog/pami": "2.*"
+    "cristianovalenca/pami": "2.*"
   }
 ```
 
@@ -144,6 +147,8 @@ can still catch them. If you catch one of these, please report it!
 * Dial
 * DTMF
 * Extension
+* EndpointList
+* EndpointListComplete
 * Hangup
 * Hold
 * JabberEvent
@@ -212,6 +217,7 @@ can still catch them. If you catch one of these, please report it!
 * CoreSettings
 * CoreShowChannels
 * CoreStatus
+* CreateConfig
 * DAHDIDialOffHookAction
 * DAHDIHangup
 * DAHDIRestart
@@ -232,11 +238,11 @@ can still catch them. If you catch one of these, please report it!
 * DongleReset
 * DongleShowDevices
 * ExtensionState
-* CreateConfig
 * GetConfig
 * GetConfigJSON
 * GetVar
 * Hangup
+* IAXPeerList
 * JabberSend
 * LocalOptimizeAway
 * Login
@@ -256,6 +262,10 @@ can still catch them. If you catch one of these, please report it!
 * ParkedCalls
 * PauseMonitor
 * Ping
+* PJSIPShowEndpoints
+* PJSIPShowRegistrationsInbound
+* PJSIPShowRegistrationsOutbound
+* PJSIPShowResourceLists
 * PlayDTMF
 * Queues
 * QueueAdd

@@ -1,13 +1,13 @@
 <?php
 /**
- * Command action message.
+ * Provide final information about an endpoint list.
  *
  * PHP Version 5
  *
  * @category   Pami
  * @package    Message
- * @subpackage Action
- * @author     Marcelo Gornstein <marcelog@gmail.com>
+ * @subpackage Event
+ * @author     Maxim Dorofeev <makdorf@gmail.com>
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @version    SVN: $Id$
  * @link       http://marcelog.github.com/PAMI/
@@ -27,33 +27,29 @@
  * limitations under the License.
  *
  */
-namespace PAMI\Message\Action;
+namespace PAMI\Message\Event;
 
 /**
- * Command action message.
+ * Provide final information about an endpoint list.
  *
  * PHP Version 5
  *
  * @category   Pami
  * @package    Message
- * @subpackage Action
+ * @subpackage Event
  * @author     Marcelo Gornstein <marcelog@gmail.com>
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @link       http://marcelog.github.com/PAMI/
  */
-class CommandAction extends ActionMessage
+class EndpointListCompleteEvent extends EventMessage
 {
     /**
-     * Constructor.
+     * Shows count of returned items.
      *
-     * @param string $command CLI Command to issue.
-     *
-     * @return void
+     * @return string key: 'ListItems'.
      */
-    public function __construct($command)
+    public function getListItems()
     {
-        parent::__construct('Command');
-        $this->setKey('Command', $command);
-        $this->setResponseHandler("Command");
+        return $this->getKey('ListItems');
     }
 }

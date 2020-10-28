@@ -1,13 +1,13 @@
 <?php
 /**
- * Command action message.
+ * Show iax2 peers.
  *
  * PHP Version 5
  *
  * @category   Pami
  * @package    Message
  * @subpackage Action
- * @author     Marcelo Gornstein <marcelog@gmail.com>
+ * @author     Cristiano Valenca <cristianovalenca85@gmail.com>
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @version    SVN: $Id$
  * @link       http://marcelog.github.com/PAMI/
@@ -30,30 +30,26 @@
 namespace PAMI\Message\Action;
 
 /**
- * Command action message.
+ * Show iax2 peers.
  *
  * PHP Version 5
  *
  * @category   Pami
  * @package    Message
  * @subpackage Action
- * @author     Marcelo Gornstein <marcelog@gmail.com>
+ * @author     Cristiano Valença <cristianovalenca85@gmail.com>
  * @license    http://marcelog.github.com/PAMI/ Apache License 2.0
  * @link       http://marcelog.github.com/PAMI/
  */
-class CommandAction extends ActionMessage
+class IAXPeerListAction extends ActionMessage
 {
     /**
      * Constructor.
      *
-     * @param string $command CLI Command to issue.
-     *
      * @return void
      */
-    public function __construct($command)
+    public function __construct()
     {
-        parent::__construct('Command');
-        $this->setKey('Command', $command);
-        $this->setResponseHandler("Command");
+        parent::__construct('IAXpeerlist');
     }
 }

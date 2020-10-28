@@ -127,6 +127,51 @@ abstract class Message
     }
 
     /**
+     * Sanitize incoming value
+     *
+     * @param string $value Key value.
+     *
+     * @return typed and sanitized value
+     */
+    protected function sanitizeInput($value)
+    {
+        if (!isset($value) || $value === null || strlen($value) == 0) {
+            return null;
+        } elseif (is_numeric($value)) {
+            // index access is safe as is_numeric('') === false
+            if ($value[0] === '0' || $value[0] === '+') {
+                // Return as string if there's a leading zero or plus sign to avoid losing information
+                return $value;
+            }
+            if (filter_var($value, FILTER_VALIDATE_INT, FILTER_FLAG_ALLOW_HEX | FILTER_FLAG_ALLOW_OCTAL)) {
+                return intval($value, 0);
+            }
+            if (filter_var($value, FILTER_VALIDATE_FLOAT, FILTER_FLAG_ALLOW_FRACTION | FILTER_FLAG_ALLOW_THOUSAND | FILTER_FLAG_ALLOW_SCIENTIFIC)) {
+                return (float)$value;
+            }
+            return (double)$value;
+        } elseif (is_string($value)) {
+            //if (filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE))
+            //    return (boolean)$value;
+            if (strcasecmp($value, 'on') === 0 || strcasecmp($value, 'true') === 0 || strcasecmp($value, 'yes') === 0) {
+                return (boolean)true;
+            }
+            if (strcasecmp($value, 'off') === 0 || strcasecmp($value, 'false') === 0 || strcasecmp($value, 'no') === 0) {
+                return (boolean)false;
+            }
+            if (filter_var($value, FILTER_SANITIZE_STRING, FILTER_NULL_ON_FAILURE)) {
+                return (string)$value;
+            }
+            if (filter_var($value, FILTER_SANITIZE_FULL_SPECIAL_CHARS, FILTER_NULL_ON_FAILURE)) {
+                return (string)htmlspecialchars($value, ENT_QUOTES);
+            }
+            throw new PAMIException("Incoming String is not sanitary. Skipping: '" . $value . "'\n");
+        } else {
+            throw new PAMIException("Don't know how to convert: '" . $value . "'\n");
+        }
+    }
+
+    /**
      * Adds a variable to this message.
      *
      * @param string $key   Key name (i.e: Action).

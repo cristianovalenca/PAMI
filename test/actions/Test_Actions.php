@@ -61,16 +61,16 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
         $mock_stream_socket_client = true;
         $mock_stream_set_blocking = true;
         $options = array(
-        	'host' => '2.3.4.5',
+        	'host' => 'lab1.voipforall.com.br',
             'scheme' => 'tcp://',
-        	'port' => 9999,
-        	'username' => 'asd',
-        	'secret' => 'asd',
-            'connect_timeout' => 10,
-        	'read_timeout' => 10
+        	'port' => 5038,
+        	'username' => 'voipforall',
+        	'secret' => 'mkcd61al',
+            'connect_timeout' => 60,
+        	'read_timeout' => 60
         );
         $writeLogin = array(
-        	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
+        	"action: Login\r\nactionid: 1432.123\r\nusername: voipforall\r\nsecret: mkcd61al\r\n"
         );
         setFgetsMock($standardAMIStart, $writeLogin);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
@@ -116,8 +116,8 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
         $write = array(implode("\r\n", array(
             'action: Login',
             'actionid: 1432.123',
-            'username: foo',
-            'secret: bar',
+            'username: voipforall',
+            'secret: mkcd61al',
             ''
         )));
         $action = new \PAMI\Message\Action\LoginAction('foo', 'bar');
@@ -131,8 +131,8 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
         $write = array(implode("\r\n", array(
             'action: Login',
             'actionid: 1432.123',
-            'username: foo',
-            'secret: bar',
+            'username: voipforall',
+            'secret: mkcd61al',
             'events: all',
             ''
         )));
@@ -269,7 +269,7 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
         $write = array(implode("\r\n", array(
         	'action: Command',
             'actionid: 1432.123',
-            'command: command',
+            'command: database show PASS',
             ''
         )));
 	    $action = new \PAMI\Message\Action\CommandAction('command');

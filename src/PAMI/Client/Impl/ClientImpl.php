@@ -1,5 +1,4 @@
 <?php
-declare(ticks=1);
 /**
  * TCP Client implementation for AMI.
  *
@@ -28,14 +27,16 @@ declare(ticks=1);
  * limitations under the License.
  *
  */
+declare(ticks=1);
 namespace PAMI\Client\Impl;
 
 use PAMI\Message\OutgoingMessage;
 use PAMI\Message\Message;
 use PAMI\Message\IncomingMessage;
 use PAMI\Message\Action\LoginAction;
-use PAMI\Message\Response\ResponseMessage;
+use PAMI\Message\Response\Response;
 use PAMI\Message\Event\Factory\Impl\EventFactoryImpl;
+use PAMI\Message\Response\Factory\Impl\ResponseFactoryImpl;
 use PAMI\Listener\IEventListener;
 use PAMI\Client\Exception\ClientException;
 use PAMI\Client\IClient;
@@ -105,6 +106,12 @@ class ClientImpl implements IClient
     private $eventFactory;
 
     /**
+     * Response factory.
+     * @var ResponseFactoryImpl
+     */
+    private $responseFactory;
+
+    /**
      * R/W timeout, in milliseconds.
      * @var integer
      */
@@ -130,7 +137,7 @@ class ClientImpl implements IClient
 
     /**
      * The receiving queue.
-     * @var IncomingMessage[]
+     * @var ResponseMessage[]
      */
     private $incomingQueue;
 
@@ -155,19 +162,34 @@ class ClientImpl implements IClient
     private $eventMask;
 
     /**
-     * Opens a tcp connection to ami.
+     * @object class
+     */
+    private $lastActionClass;
+
+
+    /**
+     * Return a formatted string containing scheme, host and port
+     *
+     * @return string
+     */
+    private function getSocketUri()
+    {
+        return sprintf('%s%s:%s', $this->scheme, $this->host, $this->port);
+    }
+
+    /**
+     * Connects a tcp connection to ami.
      *
      * @throws \PAMI\Client\Exception\ClientException
      * @return void
      */
-    public function open()
+    protected function connect()
     {
-        $cString = $this->scheme . $this->host . ':' . $this->port;
+        $errno = $errstr = null;
+        $socketUri = $this->getSocketUri();
         $this->context = stream_context_create();
-        $errno = 0;
-        $errstr = '';
         $this->socket = @stream_socket_client(
-            $cString,
+            $socketUri,
             $errno,
             $errstr,
             $this->cTimeout,
@@ -175,24 +197,51 @@ class ClientImpl implements IClient
             $this->context
         );
         if ($this->socket === false) {
-            throw new ClientException('Error connecting to ami: ' . $errstr);
+            throw new ClientException(sprintf('error: "%s" while create socket "%s"', $errstr, $socketUri));
         }
-        $msg = new LoginAction($this->user, $this->pass, $this->eventMask);
-        $asteriskId = @stream_get_line($this->socket, 1024, Message::EOL);
+        // set socket in block mode
+        if (!stream_set_blocking($this->socket, true)) {
+            throw new ClientException(sprintf('error set block mode on "%s" socket', $socketUri));
+        }
+        // set read timeout on socket
+        if (!stream_set_timeout($this->socket, $this->rTimeout)) {
+            throw new ClientException(
+                sprintf('socket "%s" timeout "%s" set error', $socketUri, $this->rTimeout)
+            );
+        }
+    }
+
+    /**
+     * Opens a tcp connection to ami.
+     *
+     * @throws \PAMI\Client\Exception\ClientException
+     * @return void
+     */
+    public function open()
+    {
+        $this->connect();
+        $socketUri = $this->getSocketUri();
+        $asteriskId = stream_get_line($this->socket, 1024, Message::EOL);
+
+        if ($asteriskId === false) {
+            throw new ClientException(sprintf('error: "%s" while read socket', socket_strerror(socket_last_error())));
+        }
+
         if (strstr($asteriskId, 'Asterisk') === false) {
-            throw new ClientException(
-                "Unknown peer. Is this an ami?: $asteriskId"
-            );
+            throw new ClientException(sprintf('Unknown peer: "%s"', $asteriskId));
         }
-        $response = $this->send($msg);
-        if (!$response->isSuccess()) {
-            throw new ClientException(
-                'Could not connect: ' . $response->getMessage()
-            );
-        }
-        @stream_set_blocking($this->socket, 0);
+        $this->logger->debug(sprintf('recv <-- asteriskId: "%s"', $asteriskId));
+
+        $msg = new LoginAction($this->user, $this->pass);
+        $this->send($msg, function (ResponseMessage $response) use ($socketUri) {
+            if (!$response->isSuccess()) {
+                throw new ClientException(
+                    sprintf('Could not connect to: "%s", response: "%s"', $socketUri, $response->getMessage())
+                );
+            }
+        });
         $this->currentProcessingMessage = '';
-        $this->logger->debug('Logged in successfully to ami.');
+        $this->logger->info(sprintf('Login to: "%s" by user: "%s"', $socketUri, $this->user));
     }
 
     /**
@@ -237,8 +286,9 @@ class ClientImpl implements IClient
     {
         $msgs = array();
         // Read something.
-        $read = @fread($this->socket, 65535);
-        if ($read === false || @feof($this->socket)) {
+        //$read = @fread($this->socket, 65535);
+        $read = @fread($this->socket, 8192);
+        if ($read === false || (empty($read) && @feof($this->socket))) {
             throw new ClientException('Error reading');
         }
         $this->currentProcessingMessage .= $read;
@@ -262,6 +312,7 @@ class ClientImpl implements IClient
      */
     public function process()
     {
+        //$msgs = $this->getMessages($outgoingMessageClass=false);
         $msgs = $this->getMessages();
         foreach ($msgs as $aMsg) {
             $this->logger->debug(
@@ -277,7 +328,11 @@ class ClientImpl implements IClient
             } elseif ($evePos !== false) {
                 $event = $this->messageToEvent($aMsg);
                 $response = $this->findResponse($event);
-                if ($response === false || $response->isComplete()) {
+                if (gettype($response) == "boolean" && $response === false) {
+                    $this->dispatch($event);
+                } elseif (!($response instanceof Response)) {
+                    $this->dispatch($event);
+                } elseif ($response->isComplete()) {
                     $this->dispatch($event);
                 } else {
                     $response->addEvent($event);
@@ -289,11 +344,14 @@ class ClientImpl implements IClient
                 $bMsg .= 'ActionId: ' . $this->lastActionId . "\r\n" . $aMsg;
                 $event = $this->messageToEvent($bMsg);
                 $response = $this->findResponse($event);
-                $response->addEvent($event);
+                if ($response instanceof Response) {
+                    $response->addEvent($event);
+                }
             }
             $this->logger->debug('----------------');
         }
     }
+
 
     /**
      * Tries to find an associated response for the given message.
@@ -323,9 +381,11 @@ class ClientImpl implements IClient
         foreach ($this->eventListeners as $data) {
             $listener = $data[0];
             $predicate = $data[1];
-            if (is_callable($predicate) && !call_user_func($predicate, $message)) {
+
+            if (!$this->evaluatePredicate($predicate, $message)) {
                 continue;
             }
+
             if ($listener instanceof \Closure) {
                 $listener($message);
             } elseif (is_array($listener)) {
@@ -337,6 +397,33 @@ class ClientImpl implements IClient
     }
 
     /**
+     * Evaluate a predicate for a message.
+     *
+     * @param $predicate a closure or an array of filters.
+     * @param \PAMI\Message\IncomingMessage $message Message to compare.
+     *
+     * @return bool
+     */
+    protected function evaluatePredicate($predicate, IncomingMessage $message)
+    {
+        if (is_callable($predicate)) {
+            return call_user_func($predicate, $message);
+        }
+
+        if (!is_array($predicate)) {
+            return true;
+        }
+
+        foreach ($predicate as $key => $value) {
+            if (!preg_match($value, $message->getKey($key))) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Returns a ResponseMessage from a raw string that came from asterisk.
      *
      * @param string $msg Raw string.
@@ -345,7 +432,7 @@ class ClientImpl implements IClient
      */
     private function messageToResponse($msg)
     {
-        $response = new ResponseMessage($msg);
+        $response = $this->responseFactory->createFromRaw($msg, $this->lastActionClass);
         $actionId = $response->getActionId();
         if (is_null($actionId)) {
             $actionId = $this->lastActionId;
@@ -372,12 +459,14 @@ class ClientImpl implements IClient
      *
      * @todo not suitable for multithreaded applications.
      *
-     * @return \PAMI\Message\IncomingMessage
+     * @param OutgoingMessage $message
+     *
+     * @return \PAMI\Message\Response\ResponseMessage
      */
     protected function getRelated(OutgoingMessage $message)
     {
         $ret = false;
-        $id = $message->getActionID('ActionID');
+        $id = $message->getActionID();
         if (isset($this->incomingQueue[$id])) {
             $response = $this->incomingQueue[$id];
             if ($response->isComplete()) {
@@ -399,26 +488,36 @@ class ClientImpl implements IClient
      */
     public function send(OutgoingMessage $message)
     {
+        $actionId = $message->getActionId();
+        if (null === $actionId) {
+            $actionId = bin2hex(random_bytes(8));
+            $message->setActionId($actionId);
+            $this->logger->debug(
+                sprintf('set actionId: "%s" on message of class "%s"', $actionId, get_class($message))
+            );
+        }
         $messageToSend = $message->serialize();
         $length = strlen($messageToSend);
         $this->logger->debug(
             '------ Sending: ------ ' . "\n" . $messageToSend . '----------'
         );
         $this->lastActionId = $message->getActionId();
+        $this->lastActionClass = $message;
         if (@fwrite($this->socket, $messageToSend) < $length) {
             throw new ClientException('Could not send message');
         }
-        $read = 0;
-        while ($read <= $this->rTimeout) {
+        $waituntil = time() + $this->rTimeout;
+        while (time() <= $waituntil) {
+            stream_set_timeout($this->socket, $this->rTimeout);
             $this->process();
+            $info = stream_get_meta_data($this->socket);
+            if ($info['timed_out']) {
+                break;
+            }
             $response = $this->getRelated($message);
             if ($response != false) {
-                $this->lastActionId = false;
+                $this->_lastActionId = false;
                 return $response;
-            }
-            usleep(1000); // 1ms delay
-            if ($this->rTimeout > 0) {
-                $read++;
             }
         }
         throw new ClientException('Read timeout');
@@ -448,6 +547,26 @@ class ClientImpl implements IClient
     }
 
     /**
+     * Get the logger implementation.
+     *
+     * @return @object The current PSR3-Logger instance
+     */
+    public function getLogger()
+    {
+        return $this->logger;
+    }
+
+    /**
+     * Returns stream socket.
+     *
+     * @return resource
+     */
+    public function getSocket()
+    {
+        return $this->socket;
+    }
+
+    /**
      * Constructor.
      *
      * @param string[] $options Options for ami client.
@@ -461,11 +580,12 @@ class ClientImpl implements IClient
         $this->user = $options['username'];
         $this->pass = $options['secret'];
         $this->cTimeout = $options['connect_timeout'];
-        $this->rTimeout = $options['read_timeout'];
+        $this->rTimeout = isset($options['read_timeout']) ? $options['read_timeout'] : 1;
         $this->scheme = isset($options['scheme']) ? $options['scheme'] : 'tcp://';
         $this->eventMask = isset($options['event_mask']) ? $options['event_mask'] : null;
         $this->eventListeners = array();
         $this->eventFactory = new EventFactoryImpl();
+        $this->responseFactory = new ResponseFactoryImpl();
         $this->incomingQueue = array();
         $this->lastActionId = false;
     }

@@ -79,11 +79,11 @@ abstract class Message
     protected $createdDate;
 
     /**
-     * Serialize function.
+     * Serialize helper function.
      *
      * @return string[]
      */
-    public function __sleep()
+    protected function __sleep()
     {
         return array('lines', 'variables', 'keys', 'createdDate');
     }
@@ -186,6 +186,24 @@ abstract class Message
     }
 
     /**
+     * Adds a variable to this message after sanitizing it first.
+     *
+     * @param string $key   Key name (i.e: Action).
+     * @param string $value Key value.
+     *
+     * @return void
+     */
+    protected function setSanitizedKey($key, $value)
+    {
+        $key = strtolower((string)$key);
+        if ($key === 'actionid' or $key === 'uniqueid' or $key === 'linkedid') {
+            $this->keys[$key] = $value;
+        } else {
+            $this->keys[$key] = $this->sanitizeInput($value);
+        }
+    }
+
+    /**
      * Returns a key by name.
      *
      * @param string $key Key name (i.e: Action).
@@ -198,7 +216,24 @@ abstract class Message
         if (!isset($this->keys[$key])) {
             return null;
         }
-        return (string)$this->keys[$key];
+        //return (string)$this->keys[$key];
+        return $this->keys[$key];
+    }
+
+    /**
+     * Returns a key by name.
+     *
+     * @param string $key Key name (i.e: Action).
+     *
+     * @return string
+     */
+    public function getBoolKey($key)
+    {
+        $key = strtolower($key);
+        if (!isset($this->keys[$key])) {
+            return null;
+        }
+        return (boolean) $this->keys[$key];
     }
 
     /**
@@ -224,6 +259,7 @@ abstract class Message
     /**
      * Returns the end of message token appended to the end of a given message.
      *
+     * @param $message
      * @return string
      */
     protected function finishMessage($message)

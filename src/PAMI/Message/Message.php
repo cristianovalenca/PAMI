@@ -83,7 +83,7 @@ abstract class Message
      *
      * @return string[]
      */
-    protected function __sleep()
+    public function __sleep()
     {
         return array('lines', 'variables', 'keys', 'createdDate');
     }

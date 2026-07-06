@@ -54,4 +54,15 @@ abstract class EventMessage extends IncomingMessage
     {
         return $this->getKey('Event');
     }
+
+    /**
+     * Returns key 'TableName'. Used by ComplexResponse to group the events
+     * enclosed between a *TableStart* and a *TableEnd* event.
+     *
+     * @return string
+     */
+    public function getTableName()
+    {
+        return $this->getKey('TableName');
+    }
 }

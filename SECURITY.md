@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability within this package, please send an email to **cristiano@voipforall.com.br**. All security vulnerabilities will be promptly addressed.
+If you discover a security vulnerability within this package, please send an email to **cristianovalenca85@gmail.com**. All security vulnerabilities will be promptly addressed.
 
 **Please do not report security vulnerabilities through public GitHub issues.**
 

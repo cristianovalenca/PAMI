@@ -191,6 +191,6 @@ class AsyncAGIStartEvent extends EventMessage
     public function __construct($rawContent)
     {
         parent::__construct($rawContent);
-        $this->setKey('Env', urldecode($this->getEnv()));
+        $this->setKey('Env', urldecode((string)$this->getEnv()));
     }
 }

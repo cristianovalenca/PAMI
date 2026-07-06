@@ -114,7 +114,7 @@ class AsyncAGIEvent extends EventMessage
     public function __construct($rawContent)
     {
         parent::__construct($rawContent);
-        $this->setKey('Env', urldecode($this->getEnvironment()));
-        $this->setKey('Result', urldecode($this->getResult()));
+        $this->setKey('Env', urldecode((string)$this->getEnvironment()));
+        $this->setKey('Result', urldecode((string)$this->getResult()));
     }
 }

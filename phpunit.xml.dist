@@ -35,6 +35,8 @@
         </include>
         <exclude>
             <directory suffix="Launcher.php">src/PAMI/Application</directory>
+            <!-- Extends the optional marcelog/pagi dependency; not installed in CI. -->
+            <directory>src/PAMI/AsyncAgi</directory>
         </exclude>
     </coverage>
 </phpunit>

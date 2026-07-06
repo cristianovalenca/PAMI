@@ -201,6 +201,6 @@ class AsyncAGIExecEvent extends EventMessage
     public function __construct($rawContent)
     {
         parent::__construct($rawContent);
-        $this->setKey('Result', urldecode($this->getResult()));
+        $this->setKey('Result', urldecode((string)$this->getResult()));
     }
 }

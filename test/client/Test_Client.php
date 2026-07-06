@@ -878,4 +878,82 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $this->assertEquals($varChan1, $event->getChannelVariables());
         $this->assertEquals($channelVars, $event->getAllChannelVariables());
     }
+
+    /**
+     * @test
+     */
+    public function exposes_socket_and_logger_accessors()
+    {
+        StreamMock::mockTime();
+        StreamMock::enable();
+        $options = array(
+            'host' => '2.3.4.5',
+            'scheme' => 'tcp://',
+            'port' => 9999,
+            'username' => 'asd',
+            'secret' => 'asd',
+            'connect_timeout' => 10,
+            'read_timeout' => 10
+        );
+        StreamMock::queue(StreamMock::standardStart(), array(
+            "action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
+        ));
+        $client = new \PAMI\Client\Impl\ClientImpl($options);
+
+        // Default logger is a PSR-3 NullLogger until one is injected.
+        $this->assertInstanceOf(\Psr\Log\LoggerInterface::class, $client->getLogger());
+        $logger = new \Psr\Log\NullLogger();
+        $client->setLogger($logger);
+        $this->assertSame($logger, $client->getLogger());
+
+        $client->open();
+        $this->assertIsResource($client->getSocket());
+        $client->close();
+    }
+
+    /**
+     * @test
+     * A message without Response/Event headers is wrapped as a ResponseEvent
+     * and attached to the pending response.
+     */
+    public function handles_response_events_without_headers()
+    {
+        StreamMock::mockTime();
+        StreamMock::enable();
+        $options = array(
+            'host' => '2.3.4.5',
+            'scheme' => 'tcp://',
+            'port' => 9999,
+            'username' => 'asd',
+            'secret' => 'asd',
+            'connect_timeout' => 1000,
+            'read_timeout' => 1000
+        );
+        StreamMock::queue(StreamMock::standardStart(), array(
+            "action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
+        ));
+        $client = new \PAMI\Client\Impl\ClientImpl($options);
+        $client->registerEventListener(new SomeListenerClass);
+        $client->open();
+
+        $event = array(
+            'Response: Success',
+            'ActionID: 1432.123',
+            'Eventlist: start',
+            'Message: Channels will follow',
+            '',
+            'Channel: pepe',
+            '',
+            'Event: CoreShowChannelsComplete',
+            'EventList: Complete',
+            'ListItems: 0',
+            'ActionID: 1432.123',
+            ''
+        );
+        StreamMock::queue($event, array("action: CoreShowChannels\r\nactionid: 1432.123\r\n"));
+        $result = $client->send(new \PAMI\Message\Action\CoreShowChannelsAction);
+        $events = $result->getEvents();
+        $this->assertEquals('ResponseEvent', $events[0]->getName());
+        $this->assertEquals('pepe', $events[0]->getKey('Channel'));
+    }
 }

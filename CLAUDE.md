@@ -20,11 +20,17 @@ vendor/bin/phpunit                     # same, uses phpunit.xml.dist at repo roo
 vendor/bin/phpunit --testsuite Message # one suite: Message | Client | Actions | Events | Compat
 vendor/bin/phpunit --filter varset_exposes_variable_name_and_value   # one test by method name
 composer cs                            # phpcs PSR12 over src (not enforced in CI)
+composer test-coverage                 # text coverage report (needs pcov/xdebug)
 ```
 
 Requires PHP 8.x locally (developed against 8.4). PHPUnit 4-era config still lives
 in `test/resources/` but is dead — the active config is the root `phpunit.xml.dist`
 with bootstrap `test/bootstrap.php`.
+
+**Coverage can't be measured locally** on the default Laravel Herd PHP — it ships
+no pcov/xdebug and there is no `pecl`/`phpize`. Measure it in CI instead: push and
+read the **Coverage** job in `.github/workflows/tests.yml` (runs PHP 8.3 + pcov).
+Baseline is ~98% lines; don't let a change drop it.
 
 ## Commits
 
@@ -75,12 +81,16 @@ To add a new Action or Event, just create `PAMI\Message\Action\XAction` /
   value (`stristr`, `strlen`, `implode`, `preg_match`, …) must cast with `(string)`
   or `?? ''` — PHP 8.1 deprecates passing `null` to these. The message classes
   already do this; keep it that way.
-- **PHP 8.x compatibility is test-enforced.** `test/compat/Test_Php8Compat.php`
-  loads every class under `E_ALL` asserting zero deprecations, parses a battery of
-  events/responses, and statically greps `src/` for forbidden constructs
+- **PHP 8.x compatibility is test-enforced.** The `Compat` suite (`test/compat/`)
+  is the safety net: `Test_Php8Compat` loads every class under `E_ALL`, parses a
+  battery of events/responses, and statically greps `src/` for forbidden constructs
   (`FILTER_SANITIZE_STRING`, `implode(array, glue)`, `each()`, `create_function()`,
-  curly-brace offset access). This suite fails the build if any regress — do not
-  reintroduce those, and add to its guard list when you find a new one.
+  curly-brace offset access). `Test_AllActions` / `Test_AllEvents` are data-driven:
+  they instantiate **every** Action/Event, serialize/call every zero-arg getter, and
+  assert no deprecation is emitted — so a new message class is auto-covered and
+  auto-guarded (this is how the `urldecode(null)` bugs were caught). Adding a new
+  Action/Event needs no test wiring; do not reintroduce the forbidden constructs, and
+  extend the guard list when you find a new one.
 - **The client tests mock PHP's stream functions by redefining them** in
   `namespace PAMI\Client\Impl` / `PAMI\Message\Action` (`stream_socket_client`,
   `fwrite`, `fread`, `microtime`, …). These live in `test/Helpers/StreamMock.php`,
@@ -103,4 +113,12 @@ To add a new Action or Event, just create `PAMI\Message\Action\XAction` /
   contain "command output follows"). When a new response type hangs `send()`, the
   cause is almost always its completion condition never being met.
 - `AsyncAgi/AsyncClientImpl` extends the optional `marcelog/pagi` dependency and is
-  excluded from the compat class-loading test.
+  excluded from the compat class-loading test and from coverage (not installed).
+
+## Releasing
+
+The package is published on Packagist as `cristianovalenca/pami`, auto-updated by a
+GitHub webhook on every push. **Publishing changes to consumers requires a version
+tag** — pushing to `master` (`dev-master`) alone does NOT reach projects that pin a
+stable constraint like `^2.0`. To release: tag `vX.Y.Z` (patch for fixes) and push
+the tag; Packagist picks it up automatically. Latest is `v2.0.3`.

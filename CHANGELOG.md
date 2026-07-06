@@ -9,6 +9,8 @@ to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-07-07
+
 ### Fixed
 - `ComplexResponse` table parsing called `$event->getTableName()`, a method that
   did not exist — any AMI event whose name contained `TableStart`/`TableEnd` would
@@ -54,5 +56,6 @@ to [Semantic Versioning](https://semver.org/).
 See the [git history](https://github.com/cristianovalenca/PAMI/commits/master) and
 the upstream [`marcelog/PAMI`](https://github.com/marcelog/PAMI) changelog.
 
-[Unreleased]: https://github.com/cristianovalenca/PAMI/compare/v2.0.3...HEAD
+[Unreleased]: https://github.com/cristianovalenca/PAMI/compare/v2.0.4...HEAD
+[2.0.4]: https://github.com/cristianovalenca/PAMI/compare/v2.0.3...v2.0.4
 [2.0.3]: https://github.com/cristianovalenca/PAMI/releases/tag/v2.0.3

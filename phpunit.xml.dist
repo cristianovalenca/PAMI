@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="test/bootstrap.php"
+         colors="true"
+         cacheResultFile="build/.phpunit.result.cache"
+         convertDeprecationsToExceptions="false"
+         convertErrorsToExceptions="true"
+         convertNoticesToExceptions="true"
+         convertWarningsToExceptions="true"
+         failOnWarning="true"
+         failOnRisky="true"
+         beStrictAboutOutputDuringTests="true"
+         verbose="true">
+    <testsuites>
+        <testsuite name="Message">
+            <directory suffix=".php">test/message</directory>
+        </testsuite>
+        <testsuite name="Client">
+            <directory suffix=".php">test/client</directory>
+        </testsuite>
+        <testsuite name="Actions">
+            <directory suffix=".php">test/actions</directory>
+        </testsuite>
+        <testsuite name="Events">
+            <directory suffix=".php">test/events</directory>
+        </testsuite>
+        <testsuite name="Compat">
+            <directory suffix=".php">test/compat</directory>
+        </testsuite>
+    </testsuites>
+    <coverage>
+        <include>
+            <directory suffix=".php">src</directory>
+        </include>
+        <exclude>
+            <directory suffix="Launcher.php">src/PAMI/Application</directory>
+        </exclude>
+    </coverage>
+</phpunit>

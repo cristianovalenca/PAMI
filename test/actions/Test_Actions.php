@@ -41,11 +41,11 @@ namespace PAMI\Client\Impl {
  * @license    http://marcelog.github.com/ Apache License 2.0
  * @link       http://marcelog.github.com/
  */
-class Test_Actions extends \PHPUnit_Framework_TestCase
+class Test_Actions extends \PHPUnit\Framework\TestCase
 {
     private $_properties = array();
 
-    public function setUp()
+    public function setUp(): void
     {
         global $mockTime;
         $this->_properties = array();
@@ -85,6 +85,15 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
             	'ActionID: 1432.123',
                 ''
 	        );
+	    } elseif ($action instanceof \PAMI\Message\Action\CommandAction) {
+            // CommandResponse only completes when its Message contains
+            // "command output follows".
+            $event = array(
+	        	'Response: Follows',
+                'ActionID: 1432.123',
+                'Message: Command output follows',
+                ''
+	        );
 	    } else {
             $event = array(
                 'Response: Success',
@@ -94,7 +103,7 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
 	    }
 	    setFgetsMock($event, $write);
 	    $result = $client->send($action);
-	    $this->assertTrue($result instanceof \PAMI\Message\Response\ResponseMessage);
+	    $this->assertTrue($result instanceof \PAMI\Message\Response\Response);
 	    return $client;
     }
     /**
@@ -120,7 +129,7 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
             'secret: mkcd61al',
             ''
         )));
-        $action = new \PAMI\Message\Action\LoginAction('foo', 'bar');
+        $action = new \PAMI\Message\Action\LoginAction('voipforall', 'mkcd61al');
         $client = $this->_start($write, $action);
     }
     /**
@@ -136,7 +145,7 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
             'events: all',
             ''
         )));
-        $action = new \PAMI\Message\Action\LoginAction('foo', 'bar', 'all');
+        $action = new \PAMI\Message\Action\LoginAction('voipforall', 'mkcd61al', 'all');
         $client = $this->_start($write, $action);
     }
     /**
@@ -272,7 +281,7 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
             'command: database show PASS',
             ''
         )));
-	    $action = new \PAMI\Message\Action\CommandAction('command');
+	    $action = new \PAMI\Message\Action\CommandAction('database show PASS');
         $client = $this->_start($write, $action);
     }
     /**
@@ -1629,10 +1638,10 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
 
     /**
      * @test
-     * @expectedException \PAMI\Exception\PAMIException
      */
     public function cannot_set_actionid_longer_than_69_characters()
     {
+        $this->expectException(\PAMI\Exception\PAMIException::class);
         $action = new \PAMI\Message\Action\PingAction();
         // A 70-character long ActionID
         $action->setActionID('1234567890123456789012345678901234567890123456789012345678901234567890');
@@ -1640,10 +1649,10 @@ class Test_Actions extends \PHPUnit_Framework_TestCase
 
     /**
      * @test
-     * @expectedException \PAMI\Exception\PAMIException
      */
     public function cannot_set_empty_actionid()
     {
+        $this->expectException(\PAMI\Exception\PAMIException::class);
         $action = new \PAMI\Message\Action\PingAction();
         // An empty ActionID
         $action->setActionID('');

@@ -202,6 +202,11 @@ abstract class IncomingMessage extends Message
                 $value = isset($content[1]) ? trim(implode(':', $content)) : '';
                 $this->channelVariables[$chanName][strtolower($name)] = $value;
                 $this->setSanitizedKey('chanvariable', $name);
+                // The channel variable has already been stored above using the
+                // original name/value. Skip the generic setSanitizedKey() below,
+                // which would otherwise re-key the message with the mutated
+                // $name/$value produced by the '=' split.
+                continue;
             } elseif (!strncmp($name, 'variable', 8)) {
                 // https://github.com/marcelog/PAMI/issues/85
                 $matches = preg_match("/\(([^\)]*)\)/", $name, $captures);
@@ -215,6 +220,10 @@ abstract class IncomingMessage extends Message
                 $value = isset($content[1]) ? trim(implode(':', $content)) : '';
                 $this->statusVariables[$chanName][strtolower($name)] = $value;
                 $this->setSanitizedKey('variable', $name);
+                // See note above: the 'variable' key is already set here with the
+                // proper variable name; skip the generic re-keying below so it is
+                // not overwritten with the mutated $name/$value.
+                continue;
             }
             // Added ResponseFactory #d3b0ce8
             try {

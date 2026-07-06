@@ -84,6 +84,11 @@ namespace PAMI\Client\Impl {
     function stream_socket_client($remote_socket, &$errno = null, &$errstr = null, $timeout = null, $flags = null, $context = null) {
         global $mock_stream_socket_client;
         if (isset($mock_stream_socket_client) && $mock_stream_socket_client === true) {
+            // Return a real in-memory stream resource so the (unmocked)
+            // stream_set_timeout()/stream_get_meta_data() calls receive a
+            // valid resource. PHP 8 raises a TypeError on null here, whereas
+            // PHP 7 silently returned false.
+            return \fopen('php://memory', 'r+');
         } else {
             return \stream_socket_client($remote_socket, $errno, $errstr, $timeout, $flags, $context);
         }
@@ -98,6 +103,15 @@ namespace PAMI\Client\Impl {
         } else {
             return call_user_func_array('\stream_set_blocking', func_get_args());
         }
+    }
+    function stream_set_timeout($stream, $seconds, $microseconds = 0) {
+        global $mock_stream_socket_client;
+        // The mocked socket is an in-memory stream, which does not support
+        // stream_set_timeout(); pretend it succeeds while mocking.
+        if (isset($mock_stream_socket_client) && $mock_stream_socket_client === true) {
+            return true;
+        }
+        return \stream_set_timeout($stream, $seconds, $microseconds);
     }
     function fwrite() {
         global $mockFwrite;
@@ -189,11 +203,11 @@ namespace PAMI\Client\Impl {
  * @license    http://marcelog.github.com/ Apache License 2.0
  * @link       http://marcelog.github.com/
  */
-class Test_Client extends \PHPUnit_Framework_TestCase
+class Test_Client extends \PHPUnit\Framework\TestCase
 {
     private $_properties = array();
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->_properties = array();
     }
@@ -212,6 +226,7 @@ class Test_Client extends \PHPUnit_Framework_TestCase
         	'read_timeout' => 10
         );
 	    $client = new \PAMI\Client\Impl\ClientImpl($options);
+        $this->assertInstanceOf(\PAMI\Client\IClient::class, $client);
     }
     /**
      * @test
@@ -239,10 +254,10 @@ class Test_Client extends \PHPUnit_Framework_TestCase
     }
     /**
      * @test
-     * @expectedException \PAMI\Client\Exception\ClientException
      */
     public function can_detect_other_peer()
     {
+        $this->expectException(\PAMI\Client\Exception\ClientException::class);
         global $mock_stream_socket_client;
         global $mock_stream_set_blocking;
         $mock_stream_socket_client = true;
@@ -526,13 +541,14 @@ class Test_Client extends \PHPUnit_Framework_TestCase
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
 	    $client->close();
+        $this->assertInstanceOf(\PAMI\Client\IClient::class, $client);
     }
     /**
      * @test
-     * @expectedException \PAMI\Client\Exception\ClientException
      */
     public function cannot_send()
     {
+        $this->expectException(\PAMI\Client\Exception\ClientException::class);
         global $mock_stream_socket_client;
         global $mock_stream_set_blocking;
         global $mockTime;
@@ -559,10 +575,10 @@ class Test_Client extends \PHPUnit_Framework_TestCase
 
     /**
      * @test
-     * @expectedException \PAMI\Client\Exception\ClientException
      */
     public function cannot_login()
     {
+        $this->expectException(\PAMI\Client\Exception\ClientException::class);
         global $mock_stream_socket_client;
         global $mock_stream_set_blocking;
         global $mockTime;
@@ -588,10 +604,10 @@ class Test_Client extends \PHPUnit_Framework_TestCase
     }
     /**
      * @test
-     * @expectedException \PAMI\Client\Exception\ClientException
      */
     public function cannot_read()
     {
+        $this->expectException(\PAMI\Client\Exception\ClientException::class);
         global $mock_stream_socket_client;
         global $mock_stream_set_blocking;
         global $mockTime;
@@ -619,10 +635,10 @@ class Test_Client extends \PHPUnit_Framework_TestCase
     }
     /**
      * @test
-     * @expectedException \PAMI\Client\Exception\ClientException
      */
     public function cannot_read_by_read_timeout()
     {
+        $this->expectException(\PAMI\Client\Exception\ClientException::class);
         global $mock_stream_socket_client;
         global $mock_stream_set_blocking;
         global $mockTime;
@@ -695,7 +711,7 @@ class Test_Client extends \PHPUnit_Framework_TestCase
         );
         setFgetsMock($event, $write);
 	    $result = $client->send(new \PAMI\Message\Action\CoreShowChannelsAction);
-	    $this->assertTrue($result instanceof \PAMI\Message\Response\ResponseMessage);
+	    $this->assertTrue($result instanceof \PAMI\Message\Response\Response);
 	    $events = $result->getEvents();
 	    $this->assertEquals(count($events), 1);
 	    $this->assertTrue($events[0] instanceof \PAMI\Message\Event\CoreShowChannelsCompleteEvent);

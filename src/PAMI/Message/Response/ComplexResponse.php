@@ -71,23 +71,23 @@ class ComplexResponse extends Response
     public function addEvent(EventMessage $event)
     {
         // not eventlist (start/complete)
-        if (stristr($event->getEventList(), 'start') === false
-            && stristr($event->getEventList(), 'complete') === false
-            && stristr($event->getName(), 'complete') === false
+        if (stristr((string)$event->getEventList(), 'start') === false
+            && stristr((string)$event->getEventList(), 'complete') === false
+            && stristr((string)$event->getName(), 'complete') === false
         ) {
             $unknownevent = "PAMI\\Message\\Event\\UnknownEvent";
             if (!($event instanceof $unknownevent)) {
                 // Handle TableStart/TableEnd Differently
-                if (stristr($event->getName(), 'TableStart') != false) {
+                if (stristr((string)$event->getName(), 'TableStart') != false) {
                     $this->temptable = array();
                     $this->temptable['Name'] = $event->getTableName();
                     $this->temptable['Entries'] = array();
-                } elseif (stristr($event->getName(), 'TableEnd') != false) {
+                } elseif (stristr((string)$event->getName(), 'TableEnd') != false) {
                     if (!is_array($this->tables)) {
                         $this->tables = array();
                     }
                     $this->tables[$event->getTableName()] = $this->temptable;
-                    unset($this->temptable);
+                    $this->temptable = null;
                 } elseif (is_array($this->temptable)) {
                     $this->temptable['Entries'][] = $event;
                 } else {
@@ -100,8 +100,8 @@ class ComplexResponse extends Response
             }
         }
         // finish eventlist
-        if (stristr($event->getEventList(), 'complete') != false
-            || stristr($event->getName(), 'complete') != false
+        if (stristr((string)$event->getEventList(), 'complete') != false
+            || stristr((string)$event->getName(), 'complete') != false
         ) {
             $this->completed = true;
         }
@@ -151,7 +151,7 @@ class ComplexResponse extends Response
      */
     public function getJSON()
     {
-        if (strlen($this->getKey('JSON')) > 0) {
+        if (strlen((string)$this->getKey('JSON')) > 0) {
             if (($json = json_decode($this->getKey('JSON'), true)) != false) {
                 return $json;
             }

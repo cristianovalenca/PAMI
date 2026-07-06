@@ -159,7 +159,10 @@ abstract class Message
             if (strcasecmp($value, 'off') === 0 || strcasecmp($value, 'false') === 0 || strcasecmp($value, 'no') === 0) {
                 return (boolean)false;
             }
-            if (filter_var($value, FILTER_SANITIZE_STRING, FILTER_NULL_ON_FAILURE)) {
+            // FILTER_SANITIZE_STRING was deprecated in PHP 8.1 and removed later;
+            // strip_tags reproduces its tag-stripping behaviour while still acting
+            // as a "is this sanitary" predicate that returns the original value.
+            if (strip_tags($value) !== '') {
                 return (string)$value;
             }
             if (filter_var($value, FILTER_SANITIZE_FULL_SPECIAL_CHARS, FILTER_NULL_ON_FAILURE)) {

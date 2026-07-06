@@ -40,11 +40,11 @@ namespace PAMI\Client\Impl {
  * @license    http://marcelog.github.com/ Apache License 2.0
  * @link       http://marcelog.github.com/
  */
-class Test_Events extends \PHPUnit_Framework_TestCase
+class Test_Events extends \PHPUnit\Framework\TestCase
 {
     private $_properties = array();
 
-    public function setUp()
+    public function setUp(): void
     {
         $this->_properties = array();
     }

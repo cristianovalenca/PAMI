@@ -81,11 +81,14 @@ To add a new Action or Event, just create `PAMI\Message\Action\XAction` /
   (`FILTER_SANITIZE_STRING`, `implode(array, glue)`, `each()`, `create_function()`,
   curly-brace offset access). This suite fails the build if any regress — do not
   reintroduce those, and add to its guard list when you find a new one.
-- **The client tests mock PHP's stream functions by redefining them inside
-  namespace blocks** in `test/client/Test_Client.php` (`stream_socket_client`,
-  `fwrite`, `fread`, `stream_set_timeout`, …). These overrides apply process-wide
-  to `PAMI\Client\Impl`, so the Actions/Events suites depend on `Test_Client.php`
-  being loaded alongside them; run those suites together, not in isolation.
+- **The client tests mock PHP's stream functions by redefining them** in
+  `namespace PAMI\Client\Impl` / `PAMI\Message\Action` (`stream_socket_client`,
+  `fwrite`, `fread`, `microtime`, …). These live in `test/Helpers/StreamMock.php`,
+  loaded from `test/bootstrap.php`, so every suite runs standalone. Drive them via
+  the `PAMI\Test\StreamMock` facade: `StreamMock::reset()` in `setUp()`, then
+  `enable()` (fake socket), `mockTime()` (freeze microtime → `1432.123` for
+  deterministic ActionIDs), and `queue($reads, $writes)` (asterisk reads / expected
+  writes). State is static — always `reset()` in `setUp()` so it can't leak.
 - **`Response.php` is the live abstract base** (extended by `GenericResponse`,
   `ComplexResponse`, `CommandResponse`); `ResponseMessage.php` is a leftover
   duplicate from the PSR-4 rename and is not what the factory returns.

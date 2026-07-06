@@ -29,6 +29,8 @@
  */
 
 namespace PAMI\Client\Impl {
+
+    use PAMI\Test\StreamMock;
 /**
  * This class will test some actions.
  *
@@ -47,19 +49,14 @@ class Test_Actions extends \PHPUnit\Framework\TestCase
 
     public function setUp(): void
     {
-        global $mockTime;
+        StreamMock::reset();
         $this->_properties = array();
-        $mockTime = true;
+        StreamMock::mockTime();
     }
 
     private function _start(array $write, \PAMI\Message\Action\ActionMessage $action)
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::enable();
         $options = array(
         	'host' => 'lab1.voipforall.com.br',
             'scheme' => 'tcp://',
@@ -72,7 +69,7 @@ class Test_Actions extends \PHPUnit\Framework\TestCase
         $writeLogin = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: voipforall\r\nsecret: mkcd61al\r\n"
         );
-        setFgetsMock($standardAMIStart, $writeLogin);
+        StreamMock::queue(StreamMock::standardStart(), $writeLogin);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
 	    if ($action instanceof \PAMI\Message\Action\DBGetAction) {
@@ -101,7 +98,7 @@ class Test_Actions extends \PHPUnit\Framework\TestCase
         		''
             );
 	    }
-	    setFgetsMock($event, $write);
+	    StreamMock::queue($event, $write);
 	    $result = $client->send($action);
 	    $this->assertTrue($result instanceof \PAMI\Message\Response\Response);
 	    return $client;

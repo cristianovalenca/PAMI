@@ -14,3 +14,6 @@ if (!defined('TMPDIR')) {
 }
 
 require_once dirname(__DIR__) . '/vendor/autoload.php';
+
+// Socket/stream function mocks + shared test doubles, available to all suites.
+require_once __DIR__ . '/Helpers/StreamMock.php';

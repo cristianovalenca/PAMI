@@ -27,170 +27,10 @@
  * limitations under the License.
  *
  */
-namespace {
-    $mockTime = false;
-    $mockTimeCount = false;
-    $mockTimeReturn = false;
-    $mock_stream_socket_client = false;
-    $mock_stream_set_blocking = false;
-    $mockFwrite = false;
-    $mockFwriteReturn = false;
-    $mockFwriteCount = 0;
-    $mockFgets = false;
-    $mockFgetsCount = 0;
-    $mockFreadReturn = false;
-    $standardAMIStart = array(
-   		'Asterisk Call Manager/1.1',
-   		'Response: Success',
-   		'ActionID: 1432.123',
-   		'Message: Authentication accepted',
-        '',
-        'Response: Goodbye',
-        'ActionID: 1432.123',
-        'Message: Thanks for all the fish.',
-        ''
-    );
-    $standardAMIStartBadLogin = array(
-   		'Asterisk Call Manager/1.1',
-   		'Response: Error', // also tests behavior when asterisk does not return an actionid
-   		'Message: Authentication accepted',
-        ''
-    );
-}
-namespace PAMI\Message\Action {
-    function microtime() {
-        global $mockTime;
-        global $mockTimeCount;
-        global $mockTimeReturn;
-        if (isset($mockTime) && $mockTime === true) {
-            return 1432.123;
-        } else {
-            return call_user_func_array('\microtime', func_get_args());
-        }
-    }
-}
+namespace PAMI\Client\Impl;
 
-namespace PAMI\Client\Impl {
-    function microtime() {
-        global $mockTime;
-        global $mockTimeCount;
-        global $mockTimeReturn;
-        if (isset($mockTime) && $mockTime === true) {
-            return 1432.123;
-        } else {
-            return call_user_func_array('\microtime', func_get_args());
-        }
-    }
-    function stream_socket_client($remote_socket, &$errno = null, &$errstr = null, $timeout = null, $flags = null, $context = null) {
-        global $mock_stream_socket_client;
-        if (isset($mock_stream_socket_client) && $mock_stream_socket_client === true) {
-            // Return a real in-memory stream resource so the (unmocked)
-            // stream_set_timeout()/stream_get_meta_data() calls receive a
-            // valid resource. PHP 8 raises a TypeError on null here, whereas
-            // PHP 7 silently returned false.
-            return \fopen('php://memory', 'r+');
-        } else {
-            return \stream_socket_client($remote_socket, $errno, $errstr, $timeout, $flags, $context);
-        }
-    }
-    function stream_socket_shutdown() {
-        return true;
-    }
-    function stream_set_blocking() {
-        global $mock_stream_set_blocking;
-        if (isset($mock_stream_set_blocking) && $mock_stream_set_blocking === true) {
-            return true;
-        } else {
-            return call_user_func_array('\stream_set_blocking', func_get_args());
-        }
-    }
-    function stream_set_timeout($stream, $seconds, $microseconds = 0) {
-        global $mock_stream_socket_client;
-        // The mocked socket is an in-memory stream, which does not support
-        // stream_set_timeout(); pretend it succeeds while mocking.
-        if (isset($mock_stream_socket_client) && $mock_stream_socket_client === true) {
-            return true;
-        }
-        return \stream_set_timeout($stream, $seconds, $microseconds);
-    }
-    function fwrite() {
-        global $mockFwrite;
-        global $mockFwriteCount;
-        global $mockFwriteReturn;
-        if (isset($mockFwrite) && $mockFwrite === true) {
-            $args = func_get_args();
-            if (isset($mockFwriteReturn[$mockFwriteCount]) && $mockFwriteReturn[$mockFwriteCount] !== false) {
-                if ($mockFwriteReturn[$mockFwriteCount] === 'fwrite error') {
-                    $mockFwriteCount++;
-                    return 0;
-                }
-                $str = $mockFwriteReturn[$mockFwriteCount] . "\r\n";
-                if ($str !== $args[1]) {
-                    throw new \Exception(
-                    	'Mocked: ' . PHP_EOL . PHP_EOL .  print_r($mockFwriteReturn[$mockFwriteCount], true) . PHP_EOL . PHP_EOL
-                        . ' is different from: ' . PHP_EOL . PHP_EOL . print_r($args[1], true)
-                    );
-                }
-            }
-            $mockFwriteCount++;
-            return strlen($args[1]);
-        } else {
-            return call_user_func_array('\fwrite', func_get_args());
-        }
-    }
-    function stream_get_line() {
-        global $mockFgets;
-        global $mockFgetsCount;
-        global $mockFgetsReturn;
-        if (isset($mockFgets) && $mockFgets === true) {
-            $result = $mockFgetsReturn[$mockFgetsCount];
-            $mockFgetsCount++;
-            return is_string($result) ? $result . "\r\n" : $result;
-        } else {
-            return call_user_func_array('\stream_get_line', func_get_args());
-        }
-    }
-    function feof($resource) {
-        global $mockFgets;
-        if (isset($mockFgets) && $mockFgets === true) {
-            return false;
-        }
-        return \feof($resource);
-    }
+use PAMI\Test\StreamMock;
 
-    function fread() {
-        global $mockFgets;
-        global $mockFgetsCount;
-        global $mockFgetsReturn;
-        if (isset($mockFgets) && $mockFgets === true) {
-            $result = $mockFgetsReturn[$mockFgetsCount];
-            $mockFgetsCount++;
-            if (is_integer($result)) {
-                sleep($result);
-                return '';
-            }
-            return is_string($result) ? $result . "\r\n" : $result;
-        } else {
-            return call_user_func_array('\fread', func_get_args());
-        }
-    }
-    function setFgetsMock(array $readValues, $writeValues)
-    {
-        global $mockFgets;
-        global $mockFopen;
-        global $mockFgetsCount;
-        global $mockFgetsReturn;
-        global $mockFwrite;
-        global $mockFwriteCount;
-        global $mockFwriteReturn;
-        $mockFgets = true;
-        $mockFopen = true;
-        $mockFwrite = true;
-        $mockFgetsCount = 0;
-        $mockFgetsReturn = $readValues;
-        $mockFwriteCount = 0;
-        $mockFwriteReturn = $writeValues;
-    }
 /**
  * This class will test the ami client
  *
@@ -209,6 +49,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
 
     public function setUp(): void
     {
+        StreamMock::reset();
         $this->_properties = array();
     }
 
@@ -258,10 +99,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
     public function can_detect_other_peer()
     {
         $this->expectException(\PAMI\Client\Exception\ClientException::class);
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -273,7 +111,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         );
         $read = array('Whatever');
         $write = array();
-        setFgetsMock($read, $write);
+        StreamMock::queue($read, $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
     }
@@ -282,13 +120,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_register_event_listener()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -301,7 +134,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
 	    $client->open();
@@ -313,7 +146,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         	'PeerStatus: Registered',
         	''
         );
-	    setFgetsMock($event, $event);
+	    StreamMock::queue($event, $event);
 	    for($i = 0; $i < 6; $i++) {
 	        $client->process();
 	    }
@@ -327,13 +160,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_register_closure_event_listener()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -346,7 +174,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $resultVariable = false;
         $client->registerEventListener(function ($event) use (&$resultVariable) {
@@ -361,7 +189,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         	'PeerStatus: Registered',
         	''
         );
-	    setFgetsMock($event, $event);
+	    StreamMock::queue($event, $event);
 	    for($i = 0; $i < 6; $i++) {
 	        $client->process();
 	    }
@@ -374,13 +202,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_register_method_event_listener()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -393,7 +216,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $resultVariable = false;
         $listener = new SomeListenerClass;
@@ -407,7 +230,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         	'PeerStatus: Registered',
         	''
         );
-	    setFgetsMock($event, $event);
+	    StreamMock::queue($event, $event);
 	    for($i = 0; $i < 6; $i++) {
 	        $client->process();
 	    }
@@ -421,13 +244,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_unregister_event_listener()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -440,7 +258,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         SomeListenerClass::$event = null;
         $id = $client->registerEventListener(new SomeListenerClass);
@@ -453,7 +271,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         	'PeerStatus: Registered',
         	''
         );
-	    setFgetsMock($event, $event);
+	    StreamMock::queue($event, $event);
 	    $client->unregisterEventListener($id);
 	    for($i = 0; $i < 6; $i++) {
 	        $client->process();
@@ -467,13 +285,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_filter_with_predicate()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -486,7 +299,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $resultVariable = false;
         $client->registerEventListener(
@@ -506,7 +319,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         	'PeerStatus: Registered',
         	''
         );
-	    setFgetsMock($event, $event);
+	    StreamMock::queue($event, $event);
 	    for($i = 0; $i < 6; $i++) {
 	        $client->process();
 	    }
@@ -518,13 +331,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_login()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -537,7 +345,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
 	    $client->close();
@@ -549,13 +357,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
     public function cannot_send()
     {
         $this->expectException(\PAMI\Client\Exception\ClientException::class);
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -568,7 +371,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	'fwrite error'
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
     }
@@ -579,13 +382,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
     public function cannot_login()
     {
         $this->expectException(\PAMI\Client\Exception\ClientException::class);
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStartBadLogin;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -598,7 +396,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStartBadLogin, $write);
+        StreamMock::queue(StreamMock::standardBadLogin(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
     }
@@ -608,13 +406,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
     public function cannot_read()
     {
         $this->expectException(\PAMI\Client\Exception\ClientException::class);
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -627,10 +420,10 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
-        setFgetsMock(array(false), $write);
+        StreamMock::queue(array(false), $write);
         $client->send(new \PAMI\Message\Action\LoginAction('asd', 'asd'));
     }
     /**
@@ -639,13 +432,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
     public function cannot_read_by_read_timeout()
     {
         $this->expectException(\PAMI\Client\Exception\ClientException::class);
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -658,10 +446,10 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
 	    $client->open();
-        setFgetsMock(array(10, 4), $write);
+        StreamMock::queue(array(10, 4), $write);
         $start = \time();
         $client->send(new \PAMI\Message\Action\LoginAction('asd', 'asd'));
         $this->assertEquals(\time() - $start, 10);
@@ -671,13 +459,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_get_response_with_associated_events()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -690,7 +473,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
 	    $client->open();
@@ -709,7 +492,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: CoreShowChannels\r\nactionid: 1432.123\r\n"
         );
-        setFgetsMock($event, $write);
+        StreamMock::queue($event, $write);
 	    $result = $client->send(new \PAMI\Message\Action\CoreShowChannelsAction);
 	    $this->assertTrue($result instanceof \PAMI\Message\Response\Response);
 	    $events = $result->getEvents();
@@ -730,13 +513,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_serialize_response_and_events()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -749,7 +527,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
 	    $client->open();
@@ -768,7 +546,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: CoreShowChannels\r\nactionid: 1432.123\r\n"
         );
-        setFgetsMock($event, $write);
+        StreamMock::queue($event, $write);
 	    $result = $client->send(new \PAMI\Message\Action\CoreShowChannelsAction);
         $ser = serialize($result);
         $result2 = unserialize($ser);
@@ -783,13 +561,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_get_response_events_without_actionid_and_event()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -802,7 +575,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
 	    $client->open();
@@ -824,7 +597,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: CoreShowChannels\r\nactionid: 1432.123\r\n"
         );
-        setFgetsMock($event, $write);
+        StreamMock::queue($event, $write);
 	    $result = $client->send(new \PAMI\Message\Action\CoreShowChannelsAction);
         $events = $result->getEvents();
         $this->assertEquals($events[0]->getName(), 'ResponseEvent');
@@ -852,8 +625,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_get_set_variable_with_multiple_values()
     {
-        global $mockTime;
-        $mockTime = true;
+        StreamMock::mockTime();
         $now = time();
         $action = new \PAMI\Message\Action\LoginAction('a', 'b');
         $this->assertEquals($now, $action->getCreatedDate());
@@ -875,13 +647,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_report_unknown_event()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -894,7 +661,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
 	    $client->open();
@@ -904,7 +671,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
             'ChannelType: SIP',
         	''
         );
-	    setFgetsMock($event, $event);
+	    StreamMock::queue($event, $event);
 	    for($i = 0; $i < 4; $i++) {
 	        $client->process();
 	    }
@@ -921,13 +688,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_get_channel_variables_without_default_channel_name()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
             'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -940,7 +702,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
             "action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
         $client->open();
@@ -960,7 +722,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
             'ChanVariable: var2=v2',
             ''
         );
-        setFgetsMock($event, $event);
+        StreamMock::queue($event, $event);
         for($i = 0; $i < 14; $i++) {
             $client->process();
         }
@@ -986,13 +748,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_get_channel_variables_with_default_channel_name()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
             'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -1005,7 +762,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
             "action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
         $client->open();
@@ -1026,7 +783,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
             'ChanVariable: var2=v2',
             ''
         );
-        setFgetsMock($event, $event);
+        StreamMock::queue($event, $event);
         for($i = 0; $i < 15; $i++) {
             $client->process();
         }
@@ -1056,13 +813,8 @@ class Test_Client extends \PHPUnit\Framework\TestCase
      */
     public function can_get_channel_variables()
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
             'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -1075,7 +827,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $write = array(
             "action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
         $client->open();
@@ -1102,7 +854,7 @@ class Test_Client extends \PHPUnit\Framework\TestCase
             'ChanVariable(SIP/jw1034-00000010): var32=value32',
             ''
         );
-        setFgetsMock($event, $event);
+        StreamMock::queue($event, $event);
         for($i = 0; $i < 21; $i++) {
             $client->process();
         }
@@ -1126,14 +878,4 @@ class Test_Client extends \PHPUnit\Framework\TestCase
         $this->assertEquals($varChan1, $event->getChannelVariables());
         $this->assertEquals($channelVars, $event->getAllChannelVariables());
     }
-}
-class SomeListenerClass implements \PAMI\Listener\IEventListener
-{
-    public static $event;
-
-    public function handle(\PAMI\Message\Event\EventMessage $event)
-    {
-        self::$event = $event;
-    }
-}
 }

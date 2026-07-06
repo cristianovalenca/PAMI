@@ -28,6 +28,8 @@
  *
  */
 namespace PAMI\Client\Impl {
+
+    use PAMI\Test\StreamMock;
 /**
  * This class will test some events.
  *
@@ -46,6 +48,7 @@ class Test_Events extends \PHPUnit\Framework\TestCase
 
     public function setUp(): void
     {
+        StreamMock::reset();
         $this->_properties = array();
     }
     /**
@@ -1516,14 +1519,9 @@ class Test_Events extends \PHPUnit\Framework\TestCase
 
     private function _testEvent($eventName, array $getters, array $values, array $translatedValues)
     {
-        global $mock_stream_socket_client;
-        global $mock_stream_set_blocking;
-        global $mockTime;
-        global $standardAMIStart;
         $eventClass = "\\PAMI\\Message\\Event\\" . $eventName . 'Event';
-        $mockTime = true;
-        $mock_stream_socket_client = true;
-        $mock_stream_set_blocking = true;
+        StreamMock::mockTime();
+        StreamMock::enable();
         $options = array(
         	'host' => '2.3.4.5',
             'scheme' => 'tcp://',
@@ -1536,7 +1534,7 @@ class Test_Events extends \PHPUnit\Framework\TestCase
         $write = array(
         	"action: Login\r\nactionid: 1432.123\r\nusername: asd\r\nsecret: asd\r\n"
         );
-        setFgetsMock($standardAMIStart, $write);
+        StreamMock::queue(StreamMock::standardStart(), $write);
         $client = new \PAMI\Client\Impl\ClientImpl($options);
         $client->registerEventListener(new SomeListenerClass);
 	    $client->open();
@@ -1546,7 +1544,7 @@ class Test_Events extends \PHPUnit\Framework\TestCase
 	        $message[] = $key . ': ' . $value;
 	    }
 	    $message[] = '';
-	    setFgetsMock($message, $message);
+	    StreamMock::queue($message, $message);
 	    for($i = 0; $i < count($message); $i++) {
 	        $client->process();
 	    }
